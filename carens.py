@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-CareNS multi-dataset experiment: S-NN vs CareNS-Train vs CareNS-Fusion
+iSAGE multi-dataset experiment: S-NN vs iSAGE-Train vs iSAGE-Fusion
 ================================
 
-Runs the CareNS experimental pattern on:
+Runs the iSAGE experimental pattern on:
 1) Breast Cancer
 2) Cardiovascular Disease
 3) Diabetes
@@ -13,7 +13,7 @@ Main experiments:
 - training-data scarcity: 100, 50, 25, 10, 5%
 - Rule-Only complementarity
 - observation scarcity: 100, 75, 50, 25%
-- symbolic knowledge is injected into CareNS during neural training
+- symbolic knowledge is injected into iSAGE during neural training
 - symbolic knowledge corruption: removal + reversal at 0,10,20,30,40%
 - joint resource degradation: S1/S2/S3
 - Resource Robustness Score (RRS)
@@ -34,16 +34,16 @@ Run from VS Code terminal:
     source .venv/bin/activate
     python -m pip install -U pip
     pip install numpy pandas scipy scikit-learn matplotlib psutil joblib xgboost
-    python carens_three_dataset_experiment.py
+    python isage_three_dataset_experiment.py
 
 Quick smoke test:
-    python carens_three_dataset_experiment.py --quick
+    python isage_three_dataset_experiment.py --quick
 
 Paper run:
-    python carens_three_dataset_experiment.py --paper
+    python isage_three_dataset_experiment.py --paper
 
 Optional conventional full-resource baselines:
-    python carens_three_dataset_experiment.py --paper --full-baselines
+    python isage_three_dataset_experiment.py --paper --full-baselines
 """
 
 from __future__ import annotations
@@ -127,14 +127,14 @@ DATASET_COLORS = {
 }
 MODEL_LINESTYLES = {
     "S-NN": "--",
-    "CareNS-Train": "-.",
-    "CareNS-Fusion": "-",
+    "iSAGE-Train": "-.",
+    "iSAGE-Fusion": "-",
     "Rule-Only": ":",
 }
 MODEL_MARKERS = {
     "S-NN": "s",
-    "CareNS-Train": "D",
-    "CareNS-Fusion": "o",
+    "iSAGE-Train": "D",
+    "iSAGE-Fusion": "o",
     "Rule-Only": "^",
 }
 
@@ -142,8 +142,8 @@ PLOT_FONT_SIZE = 30
 
 # Method names used in plots/tables:
 # S-NN          : matched neural-only baseline
-# CareNS-Train  : symbolic knowledge is incorporated during neural training
-# CareNS-Fusion : proposed method; S-NN is trained first, then symbolic
+# iSAGE-Train  : symbolic knowledge is incorporated during neural training
+# iSAGE-Fusion : proposed method; S-NN is trained first, then symbolic
 #                 probability is fused with the neural output using
 #                 validation-selected alpha and beta
 # Rule-Only     : auxiliary symbolic-only reference
@@ -803,7 +803,7 @@ def symbolic_reasoning(dataset_name, X_raw, beta=2.0, rule_weights=None):
     }
 
 
-def carens_fusion(neural_prob, symbolic_prob, symbolic_active, alpha=0.7):
+def isage_fusion(neural_prob, symbolic_prob, symbolic_active, alpha=0.7):
     neural_prob = np.asarray(neural_prob, dtype=float)
     symbolic_prob = np.asarray(symbolic_prob, dtype=float)
     active = np.asarray(symbolic_active, dtype=bool)
@@ -883,7 +883,7 @@ def symbolic_reasoning_corrupted(
 def apply_observation_mask(X_raw, observation_fraction, seed):
     """
     Random test-time observation masking.
-    Same mask realization is used for S-NN and CareNS.
+    Same mask realization is used for S-NN and iSAGE.
     ID/target columns have already been removed.
     """
     if observation_fraction >= 0.999999:
@@ -921,7 +921,7 @@ def symbolic_training_features_from_result(symbolic_result):
       3) symbolic-rule coverage / active fraction.
 
     These features are concatenated with the ordinary preprocessed clinical
-    features BEFORE fitting the CareNS MLP. Therefore symbolic knowledge is
+    features BEFORE fitting the iSAGE MLP. Therefore symbolic knowledge is
     part of neural training rather than being fused only after training.
     """
     dm = symbolic_result["direction_matrix"].to_numpy(dtype=float)
@@ -947,7 +947,7 @@ class ExperimentCache:
     def __init__(self, quick=False):
         self.quick = quick
         self.snn_cache = {}
-        self.carens_cache = {}
+        self.isage_cache = {}
 
     def fit_snn(self, dataset_name, seed, fraction, X_train, y_train):
         """
@@ -977,17 +977,17 @@ class ExperimentCache:
         self.snn_cache[key] = obj
         return obj
 
-    def fit_carens(self, dataset_name, seed, fraction, X_train, y_train):
+    def fit_isage(self, dataset_name, seed, fraction, X_train, y_train):
         """
         Knowledge-aware neural training.
 
-        CareNS-Train uses the SAME MLP architecture and optimizer settings as S-NN.
+        iSAGE-Train uses the SAME MLP architecture and optimizer settings as S-NN.
         The difference is that dataset-specific symbolic rule states are
         appended to the neural input during training.
         """
         key = (dataset_name, seed, round(float(fraction), 4))
-        if key in self.carens_cache:
-            return self.carens_cache[key]
+        if key in self.isage_cache:
+            return self.isage_cache[key]
 
         # Use exactly the same deterministic scarcity subset as S-NN.
         X_sub, y_sub = stratified_subsample(
@@ -1031,7 +1031,7 @@ class ExperimentCache:
             "rule_weights": rule_weights,
             "rule_diagnostics": rule_diagnostics,
         }
-        self.carens_cache[key] = obj
+        self.isage_cache[key] = obj
         return obj
 
 
@@ -1044,10 +1044,10 @@ def predict_model(model_obj, X_raw):
     return model_obj["model"].predict_proba(Xt)[:, 1]
 
 
-def predict_carens(model_obj, dataset_name, X_raw):
+def predict_isage(model_obj, dataset_name, X_raw):
     """
-    Predict with CareNS-Train using the same kind of symbolic features that were
-    available during CareNS neural training.
+    Predict with iSAGE-Train using the same kind of symbolic features that were
+    available during iSAGE neural training.
     """
     Xt_clinical = model_obj["preprocessor"].transform(X_raw)
     Xt_clinical = np.asarray(Xt_clinical, dtype=float)
@@ -1061,12 +1061,12 @@ def predict_carens(model_obj, dataset_name, X_raw):
     return prob, sym
 
 
-def predict_carens_from_symbolic_result(
+def predict_isage_from_symbolic_result(
     model_obj, X_raw, symbolic_result
 ):
     """
     Predict with a supplied symbolic state. This is used for the knowledge
-    corruption experiment so the trained CareNS model is evaluated with
+    corruption experiment so the trained iSAGE model is evaluated with
     removed/reversed rules without post-hoc probability fusion.
     """
     Xt_clinical = model_obj["preprocessor"].transform(X_raw)
@@ -1079,7 +1079,7 @@ def predict_carens_from_symbolic_result(
 # NOTE:
 # The previous implementation tuned alpha/beta and fused symbolic
 # probabilities after S-NN training. That is intentionally no longer the
-# primary CareNS mechanism. CareNS is now trained directly with symbolic
+# primary iSAGE mechanism. iSAGE is now trained directly with symbolic
 # features. beta=2.0 is retained only for the Rule-Only reference model.
 # ============================================================
 # POST-TRAINING SYMBOLIC FUSION
@@ -1110,7 +1110,7 @@ def tune_post_training_fusion(
         sym_prob[~np.asarray(symbolic_active, dtype=bool)] = 0.5
 
         for alpha in ALPHA_GRID:
-            fused = carens_fusion(
+            fused = isage_fusion(
                 neural_val_prob,
                 sym_prob,
                 symbolic_active,
@@ -1145,11 +1145,11 @@ def evaluate_fraction(
       1) S-NN:
          Neural model trained without symbolic knowledge.
 
-      2) CareNS-Train:
+      2) iSAGE-Train:
          Symbolic knowledge is converted to reliability-weighted symbolic
          features and appended BEFORE neural training.
 
-      3) CareNS:
+      3) iSAGE:
          The S-NN is trained first without knowledge. Symbolic knowledge is
          added AFTER training by validation-tuned probability fusion.
 
@@ -1162,7 +1162,7 @@ def evaluate_fraction(
     snn_obj = cache.fit_snn(
         dataset_name, seed, fraction, X_train, y_train
     )
-    pre_obj = cache.fit_carens(
+    pre_obj = cache.fit_isage(
         dataset_name, seed, fraction, X_train, y_train
     )
 
@@ -1198,7 +1198,7 @@ def evaluate_fraction(
     snn_prob = predict_model(snn_obj, X_test_eval)
 
     # 2) Knowledge added BEFORE neural training
-    pre_prob, symbolic_test = predict_carens(
+    pre_prob, symbolic_test = predict_isage(
         pre_obj, dataset_name, X_test_eval
     )
 
@@ -1212,7 +1212,7 @@ def evaluate_fraction(
     post_sym_prob = np.asarray(
         post_symbolic["probability"], dtype=float
     )
-    post_prob = carens_fusion(
+    post_prob = isage_fusion(
         snn_prob,
         post_sym_prob,
         post_symbolic["active"],
@@ -1288,14 +1288,14 @@ def evaluate_fraction(
         },
         {
             **common,
-            "Model": "CareNS-Train",
+            "Model": "iSAGE-Train",
             "KnowledgeTiming": "Before neural training",
             **pre_metrics,
             "RVR": pre_rvr,
         },
         {
             **common,
-            "Model": "CareNS-Fusion",
+            "Model": "iSAGE-Fusion",
             "KnowledgeTiming": "After neural training",
             **post_metrics,
             "RVR": post_rvr,
@@ -1304,13 +1304,13 @@ def evaluate_fraction(
 
     extras = {
         "snn_obj": snn_obj,
-        "carens_obj": pre_obj,
+        "isage_obj": pre_obj,
         "pre_obj": pre_obj,
         "model_obj": snn_obj,
         "post_tuned": post_tuned,
         "tuned": post_tuned,
         "snn_prob": snn_prob,
-        "carens_prob": pre_prob,
+        "isage_prob": pre_prob,
         "pre_prob": pre_prob,
         "post_prob": post_prob,
         "rule_prob": rule_prob,
@@ -1376,7 +1376,7 @@ def run_dataset_experiments(
                 observation_fraction=obs,
                 mask_seed_offset=int(obs * 1000),
             )
-            # Main comparison is S-NN and CareNS. Keep Rule-Only too
+            # Main comparison is S-NN and iSAGE. Keep Rule-Only too
             # for supplementary analysis.
             observation_rows.extend(rows)
 
@@ -1388,11 +1388,11 @@ def run_dataset_experiments(
             raise RuntimeError("Full-resource model was not created.")
 
         snn_obj = full_extras["snn_obj"]
-        carens_obj = full_extras["carens_obj"]
+        isage_obj = full_extras["isage_obj"]
 
         # Save learned symbolic-rule reliability for auditability.
-        if "rule_diagnostics" in carens_obj:
-            carens_obj["rule_diagnostics"].to_csv(
+        if "rule_diagnostics" in isage_obj:
+            isage_obj["rule_diagnostics"].to_csv(
                 ds_dir / f"rule_reliability_seed{seed}.csv",
                 index=False,
             )
@@ -1413,19 +1413,19 @@ def run_dataset_experiments(
                     beta=beta,
                     corrupted_rules=corrupted_rules,
                     corruption_mode=mode,
-                    rule_weights=carens_obj.get("rule_weights"),
+                    rule_weights=isage_obj.get("rule_weights"),
                 )
-                # CareNS-Train under corrupted symbolic inputs.
+                # iSAGE-Train under corrupted symbolic inputs.
                 # This is an auxiliary robustness analysis because the model
                 # was trained with clean symbolic features.
-                train_prob = predict_carens_from_symbolic_result(
-                    carens_obj,
+                train_prob = predict_isage_from_symbolic_result(
+                    isage_obj,
                     X_test,
                     sym,
                 )
                 train_metrics = calculate_metrics(y_test, train_prob)
 
-                # CareNS-Fusion: the neural model remains unchanged.
+                # iSAGE-Fusion: the neural model remains unchanged.
                 # Only the symbolic branch is corrupted, matching the
                 # knowledge-quality experiment described in the manuscript.
                 post_tuned = full_extras["post_tuned"]
@@ -1434,7 +1434,7 @@ def run_dataset_experiments(
                 )
                 sym_fusion_prob = np.asarray(sym_fusion_prob, dtype=float)
                 sym_fusion_prob[~sym["active"]] = 0.5
-                fusion_prob = carens_fusion(
+                fusion_prob = isage_fusion(
                     snn_prob,
                     sym_fusion_prob,
                     sym["active"],
@@ -1468,11 +1468,11 @@ def run_dataset_experiments(
                     **snn_metrics, "RVR": snn_rvr,
                 })
                 knowledge_rows.append({
-                    **base, "Model": "CareNS-Train",
+                    **base, "Model": "iSAGE-Train",
                     **train_metrics, "RVR": train_rvr,
                 })
                 knowledge_rows.append({
-                    **base, "Model": "CareNS-Fusion",
+                    **base, "Model": "iSAGE-Fusion",
                     **fusion_metrics, "RVR": fusion_rvr,
                 })
 
@@ -1488,7 +1488,7 @@ def run_dataset_experiments(
                 mask_seed_offset=20000 + int(cfg["observation_fraction"] * 1000),
             )
             for row in rows:
-                if row["Model"] not in ["S-NN", "CareNS-Train", "CareNS-Fusion"]:
+                if row["Model"] not in ["S-NN", "iSAGE-Train", "iSAGE-Fusion"]:
                     continue
                 joint_rows.append({
                     **row,
@@ -1496,10 +1496,10 @@ def run_dataset_experiments(
                 })
 
         # ----------------------------------------------------
-        # E. COMPUTE PROFILE (full-data S-NN vs CareNS)
+        # E. COMPUTE PROFILE (full-data S-NN vs iSAGE)
         # ----------------------------------------------------
         snn_obj = full_extras["snn_obj"]
-        carens_obj = full_extras["carens_obj"]
+        isage_obj = full_extras["isage_obj"]
 
         repeats = 10
 
@@ -1510,17 +1510,17 @@ def run_dataset_experiments(
             _ = predict_model(snn_obj, X_test)
             snn_times.append(time.perf_counter() - t0)
 
-        # CareNS latency: preprocessing + symbolic feature construction
+        # iSAGE latency: preprocessing + symbolic feature construction
         # + knowledge-aware neural inference
         care_times = []
         for _ in range(repeats):
             t0 = time.perf_counter()
-            _ = predict_carens(carens_obj, dataset_name, X_test)
+            _ = predict_isage(isage_obj, dataset_name, X_test)
             care_times.append(time.perf_counter() - t0)
 
         # Serialized sizes
         snn_tmp = ds_dir / f"_tmp_snn_seed{seed}.joblib"
-        care_tmp = ds_dir / f"_tmp_carens_seed{seed}.joblib"
+        care_tmp = ds_dir / f"_tmp_isage_seed{seed}.joblib"
 
         joblib.dump(
             {
@@ -1532,9 +1532,9 @@ def run_dataset_experiments(
         )
         joblib.dump(
             {
-                "preprocessor": carens_obj["preprocessor"],
-                "model": carens_obj["model"],
-                "n_symbolic_features": carens_obj["n_symbolic_features"],
+                "preprocessor": isage_obj["preprocessor"],
+                "model": isage_obj["model"],
+                "n_symbolic_features": isage_obj["n_symbolic_features"],
             },
             care_tmp,
             compress=3,
@@ -1550,7 +1550,7 @@ def run_dataset_experiments(
                 pass
 
         snn_mlp = snn_obj["model"]
-        care_mlp = carens_obj["model"]
+        care_mlp = isage_obj["model"]
 
         snn_params = int(sum(
             w.size + b.size
@@ -1576,7 +1576,7 @@ def run_dataset_experiments(
             {
                 "Dataset": dataset_name,
                 "Seed": seed,
-                "Model": "CareNS-Train",
+                "Model": "iSAGE-Train",
                 "Parameters": care_params,
                 "SerializedModelMB": care_size_mb,
                 "BatchSamples": n_test,
@@ -1691,9 +1691,9 @@ def paired_comparison_stats(df, condition_col, conditions, metric="AUROC"):
         for cond in conditions:
             care = dset[
                 (dset[condition_col] == cond) &
-                (dset["Model"] == "CareNS-Fusion")
+                (dset["Model"] == "iSAGE-Fusion")
             ][["Seed", metric, "RVR"]].rename(columns={
-                metric: "CareNS_metric", "RVR": "CareNS_RVR"
+                metric: "iSAGE_metric", "RVR": "iSAGE_RVR"
             })
 
             snn = dset[
@@ -1708,19 +1708,19 @@ def paired_comparison_stats(df, condition_col, conditions, metric="AUROC"):
                 continue
 
             diff = (
-                merged["CareNS_metric"].to_numpy() -
+                merged["iSAGE_metric"].to_numpy() -
                 merged["SNN_metric"].to_numpy()
             )
             rvr_impr = (
                 merged["SNN_RVR"].to_numpy() -
-                merged["CareNS_RVR"].to_numpy()
+                merged["iSAGE_RVR"].to_numpy()
             )
             _, p = safe_wilcoxon(
-                merged["CareNS_metric"],
+                merged["iSAGE_metric"],
                 merged["SNN_metric"],
             )
             _, p_rvr = safe_wilcoxon(
-                merged["CareNS_RVR"],
+                merged["iSAGE_RVR"],
                 merged["SNN_RVR"],
             )
             ci_lo, ci_hi = bootstrap_ci(
@@ -1798,8 +1798,8 @@ def build_knowledge_stats(knowledge_df):
                     (knowledge_df["Dataset"] == dataset) &
                     (knowledge_df["Mode"] == mode) &
                     (knowledge_df["CorruptionPercent"] == q) &
-                    (knowledge_df["Model"] == "CareNS-Fusion")
-                ][["Seed", "AUROC"]].rename(columns={"AUROC": "CareNS-Fusion"})
+                    (knowledge_df["Model"] == "iSAGE-Fusion")
+                ][["Seed", "AUROC"]].rename(columns={"AUROC": "iSAGE-Fusion"})
 
                 snn = knowledge_df[
                     (knowledge_df["Dataset"] == dataset) &
@@ -1811,14 +1811,14 @@ def build_knowledge_stats(knowledge_df):
                 merged = care.merge(snn, on="Seed")
                 if merged.empty:
                     continue
-                diff = merged["CareNS-Fusion"] - merged["SNN"]
-                _, p = safe_wilcoxon(merged["CareNS-Fusion"], merged["SNN"])
+                diff = merged["iSAGE-Fusion"] - merged["SNN"]
+                _, p = safe_wilcoxon(merged["iSAGE-Fusion"], merged["SNN"])
                 rows.append({
                     "Dataset": dataset,
                     "Mode": mode,
                     "CorruptionPercent": q,
-                    "CareNS-Fusion_AUROC_mean": merged["CareNS-Fusion"].mean(),
-                    "CareNS-Fusion_AUROC_std": merged["CareNS-Fusion"].std(ddof=1),
+                    "iSAGE-Fusion_AUROC_mean": merged["iSAGE-Fusion"].mean(),
+                    "iSAGE-Fusion_AUROC_std": merged["iSAGE-Fusion"].std(ddof=1),
                     "SNN_AUROC_mean": merged["SNN"].mean(),
                     "SNN_AUROC_std": merged["SNN"].std(ddof=1),
                     "Delta_AUROC": diff.mean(),
@@ -2076,7 +2076,7 @@ def _plot_mean_curve(ax, temp, x_col, y_col, dataset, model, annotate=False, alp
 
 def plot_metric_curves(
     df, x_col, metric, outdir, filename, title, xlabel,
-    models=("S-NN", "CareNS-Train", "CareNS-Fusion"), x_descending=False
+    models=("S-NN", "iSAGE-Train", "iSAGE-Fusion"), x_descending=False
 ):
     fig, ax = _make_fig()
 
@@ -2140,7 +2140,7 @@ def plot_effect_adding_symbolic(full_df, figdir):
 
     line_index = 0
     for dataset in DATASETS:
-        for model in ["S-NN", "CareNS-Train", "CareNS-Fusion"]:
+        for model in ["S-NN", "iSAGE-Train", "iSAGE-Fusion"]:
             s = _full_metric_summary(full_df, dataset, model)
             y = s["value"].to_numpy(dtype=float)
             style = _style_for(dataset, model)
@@ -2177,7 +2177,7 @@ def plot_ablation_components(full_df, figdir):
 
     line_index = 0
     for dataset in DATASETS:
-        for model in ["S-NN", "Rule-Only", "CareNS-Train", "CareNS-Fusion"]:
+        for model in ["S-NN", "Rule-Only", "iSAGE-Train", "iSAGE-Fusion"]:
             s = _full_metric_summary(full_df, dataset, model)
             y = s["value"].to_numpy(dtype=float)
             style = _style_for(dataset, model)
@@ -2206,10 +2206,10 @@ def plot_ablation_components(full_df, figdir):
 def plot_three_way_knowledge_timing(scarcity_df, figdir):
     """
     One separate figure per dataset comparing:
-      S-NN vs CareNS-Train vs CareNS
+      S-NN vs iSAGE-Train vs iSAGE
     under training-data scarcity.
     """
-    model_order = ["S-NN", "CareNS-Train", "CareNS-Fusion"]
+    model_order = ["S-NN", "iSAGE-Train", "iSAGE-Fusion"]
 
     for dataset in DATASETS:
         fig, ax = _make_fig()
@@ -2234,8 +2234,8 @@ def plot_three_way_knowledge_timing(scarcity_df, figdir):
                 ax, x, y,
                 color={
                     "S-NN": "#1f77b4",
-                    "CareNS-Train": "#2ca02c",
-                    "CareNS-Fusion": "#ff7f0e",
+                    "iSAGE-Train": "#2ca02c",
+                    "iSAGE-Fusion": "#ff7f0e",
                 }[model],
                 linestyle=MODEL_LINESTYLES[model],
                 marker=MODEL_MARKERS[model],
@@ -2243,8 +2243,8 @@ def plot_three_way_knowledge_timing(scarcity_df, figdir):
                 markersize=10,
                 label={
                     "S-NN": "S-NN",
-                    "CareNS-Train": "CareNS-Train",
-                    "CareNS-Fusion": "CareNS-Fusion",
+                    "iSAGE-Train": "iSAGE-Train",
+                    "iSAGE-Fusion": "iSAGE-Fusion",
                 }[model],
             )
 
@@ -2252,8 +2252,8 @@ def plot_three_way_knowledge_timing(scarcity_df, figdir):
                 x, y - sd, y + sd,
                 color={
                     "S-NN": "#1f77b4",
-                    "CareNS-Train": "#2ca02c",
-                    "CareNS-Fusion": "#ff7f0e",
+                    "iSAGE-Train": "#2ca02c",
+                    "iSAGE-Fusion": "#ff7f0e",
                 }[model],
                 alpha=0.08,
                 linewidth=0,
@@ -2286,7 +2286,7 @@ def plot_data_scarcity_all_metrics(scarcity_df, figdir):
             filename=f"DataScarcity_{metric}",
             title=f"{_metric_display_name(metric)} Under Training-Data Scarcity",
             xlabel="Available Training Data (%)",
-            models=("S-NN", "CareNS-Train", "CareNS-Fusion"),
+            models=("S-NN", "iSAGE-Train", "iSAGE-Fusion"),
             x_descending=True,
         )
 
@@ -2304,7 +2304,7 @@ def plot_observation_all_metrics(observation_df, figdir):
             filename=f"ObservationScarcity_{metric}",
             title=f"{_metric_display_name(metric)} Under Observation Scarcity",
             xlabel="Available Observations (%)",
-            models=("S-NN", "CareNS-Train", "CareNS-Fusion"),
+            models=("S-NN", "iSAGE-Train", "iSAGE-Fusion"),
             x_descending=True,
         )
 
@@ -2313,7 +2313,7 @@ def plot_three_model_scarcity(scarcity_df, figdir):
     fig, ax = _make_fig()
     line_index = 0
     for dataset in DATASETS:
-        for model in ["S-NN", "Rule-Only", "CareNS-Train", "CareNS-Fusion"]:
+        for model in ["S-NN", "Rule-Only", "iSAGE-Train", "iSAGE-Fusion"]:
             t = scarcity_df[
                 (scarcity_df["Dataset"] == dataset) &
                 (scarcity_df["Model"] == model)
@@ -2338,7 +2338,7 @@ def plot_performance_retention(scarcity_df, figdir):
     line_index = 0
     for dataset in DATASETS:
         color = DATASET_COLORS[dataset]
-        for model in ["S-NN", "CareNS-Train", "CareNS-Fusion"]:
+        for model in ["S-NN", "iSAGE-Train", "iSAGE-Fusion"]:
             temp = scarcity_df[
                 (scarcity_df["Dataset"] == dataset) &
                 (scarcity_df["Model"] == model)
@@ -2383,20 +2383,20 @@ def plot_performance_retention(scarcity_df, figdir):
     savefig(fig, figdir, "PerformanceRetention_UnderDataScarcity_MultiDataset")
 
 
-def plot_carens_advantage(scarcity_df, figdir):
+def plot_isage_advantage(scarcity_df, figdir):
     fig, ax = _make_fig()
 
     line_index = 0
     for dataset in DATASETS:
         d = scarcity_df[scarcity_df["Dataset"] == dataset]
-        care = d[d["Model"] == "CareNS-Fusion"][
+        care = d[d["Model"] == "iSAGE-Fusion"][
             ["Seed", "TrainingPercent", "AUROC"]
-        ].rename(columns={"AUROC": "CareNS-Fusion"})
+        ].rename(columns={"AUROC": "iSAGE-Fusion"})
         snn = d[d["Model"] == "S-NN"][
             ["Seed", "TrainingPercent", "AUROC"]
         ].rename(columns={"AUROC": "SNN"})
         m = care.merge(snn, on=["Seed", "TrainingPercent"])
-        m["Delta"] = m["CareNS-Fusion"] - m["SNN"]
+        m["Delta"] = m["iSAGE-Fusion"] - m["SNN"]
         s = m.groupby("TrainingPercent")["Delta"].agg(["mean", "std"]).reset_index()
         s = s.sort_values("TrainingPercent")
 
@@ -2418,7 +2418,7 @@ def plot_carens_advantage(scarcity_df, figdir):
     # left-to-right increasing order requested
     ax.set_xticks(TRAINING_PERCENT_TICKS)
     ax.set_xlabel("Available Training Data (%)")
-    ax.set_ylabel(r"$\Delta$AUROC (CareNS-Fusion - S-NN)")
+    ax.set_ylabel(r"$\Delta$AUROC (iSAGE-Fusion - S-NN)")
     # Title removed as requested; use figure caption instead
     _place_legend_top(ax, ncol=3, y=1.22)
     savefig(fig, figdir, "Value_SymbolicKnowledge_UnderDataScarcity_MultiDataset")
@@ -2432,7 +2432,7 @@ def plot_symbolic_knowledge_gain(scarcity_df, figdir):
 
     For each dataset:
       - dashed line = S-NN
-      - solid line = CareNS
+      - solid line = iSAGE
       - translucent band = AUROC gain from adding symbolic knowledge
 
     No ordinary point-value labels are drawn, keeping the figure clean.
@@ -2450,7 +2450,7 @@ def plot_symbolic_knowledge_gain(scarcity_df, figdir):
             .sort_values("TrainingPercent")
         )
         care = (
-            d[d["Model"] == "CareNS-Fusion"]
+            d[d["Model"] == "iSAGE-Fusion"]
             .groupby("TrainingPercent")["AUROC"]
             .agg(["mean", "std"])
             .reset_index()
@@ -2460,14 +2460,14 @@ def plot_symbolic_knowledge_gain(scarcity_df, figdir):
         merged = snn.merge(
             care,
             on="TrainingPercent",
-            suffixes=("_SNN", "_CareNS")
+            suffixes=("_SNN", "_iSAGE")
         )
         if merged.empty:
             continue
 
         x = merged["TrainingPercent"].to_numpy(dtype=float)
         y_snn = merged["mean_SNN"].to_numpy(dtype=float)
-        y_care = merged["mean_CareNS"].to_numpy(dtype=float)
+        y_care = merged["mean_iSAGE"].to_numpy(dtype=float)
 
         color = DATASET_COLORS[dataset]
 
@@ -2495,7 +2495,7 @@ def plot_symbolic_knowledge_gain(scarcity_df, figdir):
             label=f"{dataset} — S-NN",
         )
 
-        # CareNS after adding symbolic knowledge.
+        # iSAGE after adding symbolic knowledge.
         _smooth_line(
             ax,
             x,
@@ -2505,7 +2505,7 @@ def plot_symbolic_knowledge_gain(scarcity_df, figdir):
             marker="o",
             linewidth=3.8,
             markersize=10,
-            label=f"{dataset} — CareNS-Fusion",
+            label=f"{dataset} — iSAGE-Fusion",
         )
 
     ax.set_xticks(TRAINING_PERCENT_TICKS)
@@ -2547,14 +2547,14 @@ def plot_symbolic_knowledge_gain_per_dataset(scarcity_df, figdir):
             .sort_values("TrainingPercent")
         )
         train = (
-            d[d["Model"] == "CareNS-Train"]
+            d[d["Model"] == "iSAGE-Train"]
             .groupby("TrainingPercent")["AUROC"]
             .agg(["mean", "std"])
             .reset_index()
             .sort_values("TrainingPercent")
         )
         fusion = (
-            d[d["Model"] == "CareNS-Fusion"]
+            d[d["Model"] == "iSAGE-Fusion"]
             .groupby("TrainingPercent")["AUROC"]
             .agg(["mean", "std"])
             .reset_index()
@@ -2588,7 +2588,7 @@ def plot_symbolic_knowledge_gain_per_dataset(scarcity_df, figdir):
         e_train = merged["std_Train"].fillna(0).to_numpy(dtype=float)
         e_fusion = merged["std_Fusion"].fillna(0).to_numpy(dtype=float)
 
-        # Proposed-method gain remains defined as CareNS-Fusion - S-NN.
+        # Proposed-method gain remains defined as iSAGE-Fusion - S-NN.
         delta = y_fusion - y_snn
 
         fig, ax = _make_fig()
@@ -2625,7 +2625,7 @@ def plot_symbolic_knowledge_gain_per_dataset(scarcity_df, figdir):
             linewidth=3.4,
             markersize=9,
             capsize=8,
-            label="CareNS-Train",
+            label="iSAGE-Train",
             zorder=4,
         )
         ax.errorbar(
@@ -2637,7 +2637,7 @@ def plot_symbolic_knowledge_gain_per_dataset(scarcity_df, figdir):
             linewidth=3.8,
             markersize=10,
             capsize=8,
-            label="CareNS-Fusion",
+            label="iSAGE-Fusion",
             zorder=5,
         )
 
@@ -2774,7 +2774,7 @@ def plot_symbolic_knowledge_gain_three_panels(scarcity_df, figdir):
             .sort_values("TrainingPercent")
         )
         care = (
-            d[d["Model"] == "CareNS-Fusion"]
+            d[d["Model"] == "iSAGE-Fusion"]
             .groupby("TrainingPercent")["AUROC"]
             .agg(["mean", "std"])
             .reset_index()
@@ -2784,16 +2784,16 @@ def plot_symbolic_knowledge_gain_three_panels(scarcity_df, figdir):
         merged = snn.merge(
             care,
             on="TrainingPercent",
-            suffixes=("_SNN", "_CareNS")
+            suffixes=("_SNN", "_iSAGE")
         )
         if merged.empty:
             continue
 
         x = merged["TrainingPercent"].to_numpy(dtype=float)
         y_snn = merged["mean_SNN"].to_numpy(dtype=float)
-        y_care = merged["mean_CareNS"].to_numpy(dtype=float)
+        y_care = merged["mean_iSAGE"].to_numpy(dtype=float)
         e_snn = merged["std_SNN"].fillna(0).to_numpy(dtype=float)
-        e_care = merged["std_CareNS"].fillna(0).to_numpy(dtype=float)
+        e_care = merged["std_iSAGE"].fillna(0).to_numpy(dtype=float)
         delta = y_care - y_snn
 
         ax.fill_between(
@@ -2810,7 +2810,7 @@ def plot_symbolic_knowledge_gain_three_panels(scarcity_df, figdir):
             x, y_care, yerr=e_care,
             fmt="s-", color="#ff7f0e",
             linewidth=3.0, markersize=8, capsize=6,
-            label="CareNS-Fusion (Post-Training Knowledge)"
+            label="iSAGE-Fusion (Post-Training Knowledge)"
         )
 
         for i, (xi, ys, yc, dval) in enumerate(zip(x, y_snn, y_care, delta)):
@@ -2872,7 +2872,7 @@ def plot_symbolic_consistency_observation(observation_df, figdir):
     fig, ax = _make_fig()
     line_index = 0
     for dataset in DATASETS:
-        for model in ["S-NN", "CareNS-Train", "CareNS-Fusion"]:
+        for model in ["S-NN", "iSAGE-Train", "iSAGE-Fusion"]:
             temp = observation_df[
                 (observation_df["Dataset"] == dataset) &
                 (observation_df["Model"] == model)
@@ -2895,12 +2895,12 @@ def plot_knowledge_reversal(knowledge_df, figdir):
     line_index = 0
 
     for dataset in DATASETS:
-        # CareNS under removal and reversal
-        for mode, style_name in [("removal", "CareNS-Fusion"), ("reversal", "CareNS-Fusion")]:
+        # iSAGE under removal and reversal
+        for mode, style_name in [("removal", "iSAGE-Fusion"), ("reversal", "iSAGE-Fusion")]:
             t = knowledge_df[
                 (knowledge_df["Dataset"] == dataset) &
                 (knowledge_df["Mode"] == mode) &
-                (knowledge_df["Model"] == "CareNS-Fusion")
+                (knowledge_df["Model"] == "iSAGE-Fusion")
             ]
             if t.empty:
                 continue
@@ -2947,7 +2947,7 @@ def plot_knowledge_reversal(knowledge_df, figdir):
 
 
 def plot_removal_vs_reversal(knowledge_df, figdir):
-    # Keep a second version with only CareNS lines, if user wants a cleaner figure too.
+    # Keep a second version with only iSAGE lines, if user wants a cleaner figure too.
     fig, ax = _make_fig()
     line_index = 0
     for dataset in DATASETS:
@@ -2956,7 +2956,7 @@ def plot_removal_vs_reversal(knowledge_df, figdir):
             t = knowledge_df[
                 (knowledge_df["Dataset"] == dataset) &
                 (knowledge_df["Mode"] == mode) &
-                (knowledge_df["Model"] == "CareNS-Fusion")
+                (knowledge_df["Model"] == "iSAGE-Fusion")
             ]
             s = _mean_std(t, ["CorruptionPercent"], "AUROC").sort_values(
                 "CorruptionPercent"
@@ -2975,17 +2975,17 @@ def plot_removal_vs_reversal(knowledge_df, figdir):
             pass  # value labels removed for cleaner plots
             line_index += 1
     ax.set_xlabel("Corrupted Symbolic Rules (%)")
-    ax.set_ylabel("CareNS-Fusion AUROC")
+    ax.set_ylabel("iSAGE-Fusion AUROC")
     # Title removed as requested; use figure caption instead
     _place_legend_top(ax, ncol=3, y=1.30)
-    savefig(fig, figdir, "CareNSFusion_RemovalVsReversal_MultiDataset")
+    savefig(fig, figdir, "iSAGEFusion_RemovalVsReversal_MultiDataset")
 
 
 def plot_symbolic_consistency_data(scarcity_df, figdir):
     fig, ax = _make_fig()
     line_index = 0
     for dataset in DATASETS:
-        for model in ["S-NN", "CareNS-Train", "CareNS-Fusion"]:
+        for model in ["S-NN", "iSAGE-Train", "iSAGE-Fusion"]:
             temp = scarcity_df[
                 (scarcity_df["Dataset"] == dataset) &
                 (scarcity_df["Model"] == model)
@@ -3008,7 +3008,7 @@ def plot_performance_observation_scarcity(observation_df, figdir):
     fig, ax = _make_fig()
     line_index = 0
     for dataset in DATASETS:
-        for model in ["S-NN", "CareNS-Train", "CareNS-Fusion"]:
+        for model in ["S-NN", "iSAGE-Train", "iSAGE-Fusion"]:
             temp = observation_df[
                 (observation_df["Dataset"] == dataset) &
                 (observation_df["Model"] == model)
@@ -3035,7 +3035,7 @@ def plot_joint_resource(joint_df, figdir):
 
     for dataset in DATASETS:
         color = DATASET_COLORS[dataset]
-        for model in ["S-NN", "CareNS-Train", "CareNS-Fusion"]:
+        for model in ["S-NN", "iSAGE-Train", "iSAGE-Fusion"]:
             temp = joint_df[
                 (joint_df["Dataset"] == dataset) &
                 (joint_df["Model"] == model)
@@ -3086,7 +3086,7 @@ def plot_rrs(rrs_df, figdir):
     width = 0.24
 
     fig, ax = _make_fig()
-    compare_models = ["S-NN", "CareNS-Train", "CareNS-Fusion"]
+    compare_models = ["S-NN", "iSAGE-Train", "iSAGE-Fusion"]
 
     for i, model in enumerate(compare_models):
         means, stds = [], []
@@ -3108,7 +3108,7 @@ def plot_rrs(rrs_df, figdir):
             color=[DATASET_COLORS[d] for d in datasets],
             edgecolor="black",
             linewidth=1.0,
-            hatch={"S-NN": "//", "CareNS-Train": "..", "CareNS-Fusion": ""}[model],
+            hatch={"S-NN": "//", "iSAGE-Train": "..", "iSAGE-Fusion": ""}[model],
             alpha=0.95 if model != "S-NN" else 0.72,
             label=model,
         )
@@ -3125,7 +3125,7 @@ def plot_rrs(rrs_df, figdir):
 
 def plot_full_resource_bars(full_df, figdir):
     summary = (
-        full_df[full_df["Model"].isin(["S-NN", "CareNS-Train", "CareNS-Fusion"])]
+        full_df[full_df["Model"].isin(["S-NN", "iSAGE-Train", "iSAGE-Fusion"])]
         .groupby(["Dataset", "Model"])["AUROC"]
         .agg(["mean", "std"])
         .reset_index()
@@ -3136,7 +3136,7 @@ def plot_full_resource_bars(full_df, figdir):
     width = 0.24
 
     fig, ax = _make_fig()
-    compare_models = ["S-NN", "CareNS-Train", "CareNS-Fusion"]
+    compare_models = ["S-NN", "iSAGE-Train", "iSAGE-Fusion"]
     for i, model in enumerate(compare_models):
         means = []
         stds = []
@@ -3156,7 +3156,7 @@ def plot_full_resource_bars(full_df, figdir):
             capsize=6,
             color=[DATASET_COLORS[d] for d in datasets],
             edgecolor="black",
-            hatch={"S-NN": "//", "CareNS-Train": "..", "CareNS-Fusion": ""}[model],
+            hatch={"S-NN": "//", "iSAGE-Train": "..", "iSAGE-Fusion": ""}[model],
             alpha=0.72 if model == "S-NN" else 0.95,
             label=model,
         )
@@ -3265,12 +3265,12 @@ def export_all_tables(all_results, outdir):
             "Definition": "Neural model trained using clinical features only."
         },
         {
-            "Model": "CareNS-Train",
+            "Model": "iSAGE-Train",
             "KnowledgeUse": "During training",
             "Definition": "Reliability-weighted symbolic features are added to the neural input during training."
         },
         {
-            "Model": "CareNS-Fusion",
+            "Model": "iSAGE-Fusion",
             "KnowledgeUse": "After neural training",
             "Definition": "S-NN is trained first; symbolic probability is conditionally fused with neural probability using validation-selected alpha and beta."
         },
@@ -3380,12 +3380,12 @@ def export_all_tables(all_results, outdir):
                 (scarcity_df["TrainingPercent"] == pct)
             ]
             snn = temp[temp["Model"] == "S-NN"]["AUROC"]
-            train_knowledge = temp[temp["Model"] == "CareNS-Train"]["AUROC"]
-            care = temp[temp["Model"] == "CareNS-Fusion"]["AUROC"]
+            train_knowledge = temp[temp["Model"] == "iSAGE-Train"]["AUROC"]
+            care = temp[temp["Model"] == "iSAGE-Fusion"]["AUROC"]
             rule = temp[temp["Model"] == "Rule-Only"]["AUROC"]
 
             merged = (
-                temp[temp["Model"] == "CareNS-Fusion"][["Seed", "AUROC", "RVR"]]
+                temp[temp["Model"] == "iSAGE-Fusion"][["Seed", "AUROC", "RVR"]]
                 .rename(columns={"AUROC": "Care_AUC", "RVR": "Care_RVR"})
                 .merge(
                     temp[temp["Model"] == "S-NN"][["Seed", "AUROC", "RVR"]]
@@ -3398,9 +3398,9 @@ def export_all_tables(all_results, outdir):
                 "Dataset": dataset,
                 "Training": f"{pct:.0f}%",
                 "S-NN_AUROC": f"{snn.mean():.3f} ± {snn.std(ddof=1):.3f}",
-                "CareNS-Train_AUROC": f"{train_knowledge.mean():.3f} ± {train_knowledge.std(ddof=1):.3f}",
+                "iSAGE-Train_AUROC": f"{train_knowledge.mean():.3f} ± {train_knowledge.std(ddof=1):.3f}",
                 "RuleOnly_AUROC": f"{rule.mean():.3f} ± {rule.std(ddof=1):.3f}",
-                "CareNS-Fusion_AUROC": f"{care.mean():.3f} ± {care.std(ddof=1):.3f}",
+                "iSAGE-Fusion_AUROC": f"{care.mean():.3f} ± {care.std(ddof=1):.3f}",
                 "Delta_AUROC": (care.mean() - snn.mean()),
                 "RVR_Improvement": (
                     merged["SNN_RVR"].mean() - merged["Care_RVR"].mean()
@@ -3427,16 +3427,16 @@ def export_all_tables(all_results, outdir):
                 "Dataset": dataset,
                 "TrainingPercent": pct,
             }
-            for model in ["S-NN", "CareNS-Train", "CareNS-Fusion"]:
+            for model in ["S-NN", "iSAGE-Train", "iSAGE-Fusion"]:
                 vals = temp[temp["Model"] == model]["AUROC"]
                 row[f"{model}_AUROC_mean"] = vals.mean()
                 row[f"{model}_AUROC_std"] = vals.std(ddof=1)
             row["TrainKnowledge_minus_SNN"] = (
-                row["CareNS-Train_AUROC_mean"] -
+                row["iSAGE-Train_AUROC_mean"] -
                 row["S-NN_AUROC_mean"]
             )
-            row["CareNS_Fusion_minus_SNN"] = (
-                row["CareNS-Fusion_AUROC_mean"] -
+            row["iSAGE_Fusion_minus_SNN"] = (
+                row["iSAGE-Fusion_AUROC_mean"] -
                 row["S-NN_AUROC_mean"]
             )
             timing_rows.append(row)
@@ -3477,7 +3477,7 @@ def export_all_figures(all_results, stats, outdir):
     plot_observation_all_metrics(observation_df, figdir)
     plot_three_model_scarcity(scarcity_df, figdir)
     plot_performance_retention(scarcity_df, figdir)
-    plot_carens_advantage(scarcity_df, figdir)
+    plot_isage_advantage(scarcity_df, figdir)
     plot_symbolic_knowledge_gain_per_dataset(scarcity_df, figdir)
     plot_symbolic_coverage(observation_df, figdir)
     plot_symbolic_consistency_data(scarcity_df, figdir)
@@ -3518,7 +3518,7 @@ def export_all_figures(all_results, stats, outdir):
 
 def parse_args():
     p = argparse.ArgumentParser(
-        description="CareNS three-dataset experiment"
+        description="iSAGE three-dataset experiment"
     )
     p.add_argument(
         "--data-dir",
@@ -3577,7 +3577,7 @@ def main():
     ensure_dir(args.output_dir / "figures")
 
     print("=" * 80)
-    print("CareNS THREE-DATASET EXPERIMENT")
+    print("iSAGE THREE-DATASET EXPERIMENT")
     print("=" * 80)
     print("Seeds:", seeds)
     print("Mode:", "QUICK" if quick else "PAPER/FULL")
