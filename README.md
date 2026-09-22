@@ -1,13 +1,13 @@
-# CareNS
+# iSAGE
 
-**CareNS** is a lightweight neuro-symbolic framework for clinical AI under resource scarcity.  
+**iSAGE** is a lightweight neuro-symbolic framework for clinical AI under resource scarcity.  
 The project studies how explicit symbolic knowledge affects prediction when labeled data, patient observations, neural capacity, or knowledge quality become limited.
 
-The main goal is not to show that symbolic knowledge always improves prediction. Instead, CareNS evaluates when symbolic knowledge helps, when its effect becomes limited, and when incorrect knowledge can become harmful.
+The main goal is not to show that symbolic knowledge always improves prediction. Instead, iSAGE evaluates when symbolic knowledge helps, when its effect becomes limited, and when incorrect knowledge can become harmful.
 
 ## Overview
 
-CareNS combines a lightweight neural model with explicit symbolic knowledge.
+iSAGE combines a lightweight neural model with explicit symbolic knowledge.
 
 The neural component learns predictive patterns from patient data, while the symbolic component represents domain knowledge through task-specific rules. Symbolic evidence is used only when relevant rules are active and is combined with the neural output through conditional fusion.
 
@@ -18,7 +18,7 @@ The framework studies four main resource dimensions:
 - Computational capacity
 - Symbolic knowledge reliability
 
-CareNS also compares symbolic knowledge introduced during neural model fitting with symbolic knowledge added after neural training.
+iSAGE also compares symbolic knowledge introduced during neural model fitting with symbolic knowledge added after neural training.
 
 ## Main Research Questions
 
@@ -56,12 +56,12 @@ The experiments include the following configurations:
 
 - **S-NN**: neural-only baseline using the matched lightweight neural architecture.
 - **Rule-Only**: symbolic prediction without neural evidence.
-- **CareNS-Train**: rule-derived symbolic information is included in the neural input during model fitting.
-- **CareNS-Fusion**: the neural model is trained first and symbolic probability is conditionally fused with the neural prediction afterward.
+- **iSAGE-Train**: rule-derived symbolic information is included in the neural input during model fitting.
+- **iSAGE-Fusion**: the neural model is trained first and symbolic probability is conditionally fused with the neural prediction afterward.
 
 ## Resource Scarcity Experiments
 
-CareNS is evaluated under several controlled resource conditions.
+iSAGE is evaluated under several controlled resource conditions.
 
 ### Training-Data Scarcity
 The available labeled training data are progressively reduced to study whether symbolic knowledge becomes more useful when neural supervision is limited.
@@ -103,13 +103,13 @@ Statistical comparisons are performed across independent random seeds.
 
 ## Main Findings
 
-The experiments show that the value of symbolic knowledge depends on the dataset and resource condition. Under strong training-data scarcity, CareNS-Fusion provides useful gains for Breast Cancer and Cardiovascular prediction. The Diabetes experiments show that symbolic fusion is not always beneficial, especially when the symbolic knowledge does not sufficiently complement the neural model. The knowledge-reliability experiments also show that incorrect symbolic knowledge can be more harmful than missing knowledge. Rule removal mainly reduces symbolic support, while reversed rules can push predictions in the wrong direction. The comparison between training-time and post-training symbolic integration shows that knowledge timing is task dependent. Post-training fusion is more favorable for Breast Cancer and Cardiovascular prediction under severe scarcity, while training-time integration is more competitive for Diabetes in several conditions.
+The experiments show that the value of symbolic knowledge depends on the dataset and resource condition. Under strong training-data scarcity, iSAGE-Fusion provides useful gains for Breast Cancer and Cardiovascular prediction. The Diabetes experiments show that symbolic fusion is not always beneficial, especially when the symbolic knowledge does not sufficiently complement the neural model. The knowledge-reliability experiments also show that incorrect symbolic knowledge can be more harmful than missing knowledge. Rule removal mainly reduces symbolic support, while reversed rules can push predictions in the wrong direction. The comparison between training-time and post-training symbolic integration shows that knowledge timing is task dependent. Post-training fusion is more favorable for Breast Cancer and Cardiovascular prediction under severe scarcity, while training-time integration is more competitive for Diabetes in several conditions.
 
 ## Repository Structure
 
 A typical project structure is:
 ```bash
-CareNS/
+iSAGE/
 ├── data/
 ├── results/
 │   ├── figures/
@@ -121,18 +121,18 @@ CareNS/
 ```
 ## How to Run
 
-Follow the steps below to run the CareNS experiments.
+Follow the steps below to run the iSAGE experiments.
 
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/debashis2124/CareNS.git
-cd CareNS
+git clone https://github.com/debashis2124/iSAGE.git
+cd iSAGE
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 python3 -m pip install -r requirements.txt
-python run_carens.py
+python run_iSAGE.py
 
 
-One thing to verify before adding this: if your actual main Python file is not `carens.py`, replace that filename with the exact script name used in the repository. If you need more details, contact: debashis.das@ieee.org
+One thing to verify before adding this: if your actual main Python file is not `iSAGE.py`, replace that filename with the exact script name used in the repository. If you need more details, contact: debashis.das@ieee.org
